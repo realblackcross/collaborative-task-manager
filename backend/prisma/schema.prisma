@@ -7,8 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-
 enum TaskPriority {
   LOW
   MEDIUM
@@ -23,20 +21,32 @@ enum TaskStatus {
   COMPLETED
 }
 
-model Task {
-  id           String        @id @default(uuid())
-  title        String        @db.VarChar(100)
-  description  String
-  dueDate      DateTime
-  priority     TaskPriority
-  status       TaskStatus    @default(TODO)
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  creatorId    String
-  creator      User          @relation("CreatedTasks", fields: [creatorId], references: [id])
+  createdTasks  Task[] @relation("CreatedTasks")
+  assignedTasks Task[] @relation("AssignedTasks")
+}
+
+model Task {
+  id          String       @id @default(uuid())
+  title       String
+  description String
+  dueDate     DateTime
+  priority    TaskPriority
+  status      TaskStatus   @default(TODO)
+
+  creatorId String
+  creator   User   @relation("CreatedTasks", fields: [creatorId], references: [id])
 
   assignedToId String?
-  assignedTo   User?         @relation("AssignedTasks", fields: [assignedToId], references: [id])
+  assignedTo   User?   @relation("AssignedTasks", fields: [assignedToId], references: [id])
 
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

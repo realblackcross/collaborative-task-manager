@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import prisma from "./prisma";
 import authRoutes from "./routes/auth";
 import { authMiddleware, AuthRequest } from "./middleware/auth";
+import { sendMail } from "./utils/mailer";
+
 
 import http from "http";
 import { Server as SocketIOServer } from "socket.io";
@@ -82,6 +84,28 @@ app.post("/tasks", authMiddleware, async (req: AuthRequest, res: Response) => {
     });
 
     io.emit("task:created", task);
+    if (task.assignedTo) {
+      try {
+        await sendMail({
+          to: task.assignedTo.email,
+          subject: "New Task Assigned 📌",
+          text: `Hi ${task.assignedTo.name},
+    
+    A new task has been assigned to you.
+    
+    Title: ${task.title}
+    Priority: ${task.priority}
+    Due Date: ${task.dueDate?.toDateString()}
+    
+    Assigned by: ${task.creator.name}
+    
+    — Collaborative Task Manager`,
+        });
+      } catch (err) {
+        console.error("Email failed (ignored):", err);
+      }
+    }
+    
     res.json(task);
   } catch (err) {
     console.error(err);
@@ -101,7 +125,7 @@ app.get("/tasks", authMiddleware, async (req: AuthRequest, res: Response) => {
         ],
       },
       orderBy: {
-        dueDate: "asc", // ✅ EARLIEST FIRST
+        dueDate: "asc",
       },
       include: {
         assignedTo: {
@@ -111,8 +135,16 @@ app.get("/tasks", authMiddleware, async (req: AuthRequest, res: Response) => {
             email: true,
           },
         },
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
     });
+    
     
 
     res.json(tasks);
@@ -149,6 +181,7 @@ app.patch(
 );
 
 /** ASSIGN TASK */
+/** ASSIGN TASK */
 app.patch(
   "/tasks/:id/assign",
   authMiddleware,
@@ -162,9 +195,71 @@ app.patch(
         data: assignedToId
           ? { assignedTo: { connect: { id: assignedToId } } }
           : {},
+          include: {
+            assignedTo: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+            creator: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+          
       });
 
-      io.emit("task:assigned", updatedTask); // ✅ SOCKET EMIT
+      // 📧 SEND MAIL TO ASSIGNED USER
+      // if (updatedTask.assignedTo) 
+//         await sendMail(
+//           updatedTask.assignedTo.email,
+//           "New Task Assigned 📌",
+//           `Hi ${updatedTask.assignedTo.name},
+
+// A new task has been assigned to you.
+
+// Title: ${updatedTask.title}
+// Priority: ${updatedTask.priority}
+// Due Date: ${updatedTask.dueDate?.toDateString()}
+
+// Assigned by: ${updatedTask.creator.name}
+
+// Please login to view the task.
+
+// — Collaborative Task Manager`
+//         );
+//       }
+
+if (updatedTask.assignedTo) {
+  try {
+    await sendMail({
+      to: updatedTask.assignedTo.email,
+      subject: "New Task Assigned 📌",
+      text: `Hi ${updatedTask.assignedTo.name},
+
+You have been assigned a new task.
+
+Title: ${updatedTask.title}
+Priority: ${updatedTask.priority}
+Due Date: ${updatedTask.dueDate?.toDateString()}
+
+Assigned by: ${updatedTask.creator.name}
+
+— Collaborative Task Manager`,
+    });
+  } catch {
+    // console.error("Email failed (ignored):", err);
+  }
+}
+
+
+
+      io.emit("task:assigned", updatedTask);
       res.json(updatedTask);
     } catch (err) {
       console.error(err);
@@ -172,6 +267,7 @@ app.patch(
     }
   }
 );
+
 
 /** DELETE TASK */
 app.delete(

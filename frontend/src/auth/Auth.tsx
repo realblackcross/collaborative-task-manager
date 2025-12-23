@@ -63,7 +63,8 @@ export default function Auth({ onAuthSuccess }: Props) {
     const data = await res.json();
 
     if (!res.ok) {
-      setError(data.error || "Authentication failed");
+      setError(data.message || data.error || "Something went wrong");
+
       return;
     }
 

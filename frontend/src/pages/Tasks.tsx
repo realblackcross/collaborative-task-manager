@@ -2,6 +2,28 @@ import { useEffect, useState } from "react";
 
 /* ================= TYPES ================= */
 
+// type Task = {
+//   id: string;
+//   title: string;
+//   description: string;
+//   priority: string;
+//   status: string;
+//   dueDate?: string | null;
+
+//   // 🔹 ADD
+//   assignedTo?: {
+//     id: string;
+//     name: string;
+//     email: string;
+//   } | null;
+// };
+
+// type User = {
+//   id: string;
+//   name: string;
+//   email: string;
+// };
+
 type Task = {
   id: string;
   title: string;
@@ -10,19 +32,19 @@ type Task = {
   status: string;
   dueDate?: string | null;
 
-  // 🔹 ADD
   assignedTo?: {
     id: string;
     name: string;
     email: string;
   } | null;
+
+  creator?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 };
 
-type User = {
-  id: string;
-  name: string;
-  email: string;
-};
 
 /* ================= COMPONENT ================= */
 
@@ -224,6 +246,12 @@ export default function Tasks({ onLogout }: { onLogout: () => void }) {
               {task.assignedTo ? task.assignedTo.name : "Unassigned"}
             </p>
 
+            <p>
+  <b>Assigned By:</b>{" "}
+  {task.creator ? task.creator.name : "Unknown"}
+</p>
+
+
             {task.status !== "COMPLETED" && (
               <button style={actionBtn} onClick={() => completeTask(task.id)}>
                 Complete
@@ -267,14 +295,39 @@ export default function Tasks({ onLogout }: { onLogout: () => void }) {
             <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
 
             {/* 🔹 ADD — assign user */}
-            <select value={assignedToId} onChange={e => setAssignedToId(e.target.value)}>
-              <option value="">Assign to (optional)</option>
-              {users.map(u => (
-                <option key={u.id} value={u.id}>
-                  {u.name} ({u.email})
-                </option>
-              ))}
-            </select>
+<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+  <label
+    style={{
+      fontSize: 13,
+      fontWeight: 600,
+      color: "#333",
+    }}
+  >
+    Assign Task To
+  </label>
+
+  <select
+    value={assignedToId}
+    onChange={(e) => setAssignedToId(e.target.value)}
+    style={{
+      padding: "10px 12px",
+      borderRadius: 8,
+      border: "1px solid #ccc",
+      fontSize: 14,
+      background: "#fff",
+      cursor: "pointer",
+    }}
+  >
+    <option value="">— Unassigned —</option>
+
+    {users.map((u) => (
+      <option key={u.id} value={u.id}>
+        {u.name} ({u.email})
+      </option>
+    ))}
+  </select>
+</div>
+
 
             <div style={modalActions}>
   <button style={actionBtn} onClick={createTask}>Save</button>

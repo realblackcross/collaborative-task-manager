@@ -2,6 +2,8 @@ import { Router, Request, Response } from "express";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import prisma from "../prisma";
+import { sendMail } from "../utils/mailer";
+
 
 const router = Router();
 
@@ -33,6 +35,17 @@ router.post("/register", async (req: Request, res: Response) => {
         password: hashedPassword,
       },
     });
+
+    try {
+      await sendMail({
+        to: user.email,
+        subject: "Welcome",
+        text: "Welcome to Collaborative Task Manager",
+      });
+    } catch (err) {
+      console.error("Welcome mail failed (ignored)");
+    }
+    
 
     res.status(201).json({
       id: user.id,
@@ -89,6 +102,8 @@ router.post("/login", async (req: Request, res: Response) => {
     res.status(500).json({ message: "Login failed" });
   }
 });
+
+
 
 /**
  * POST /auth/reset-password
