@@ -80,7 +80,15 @@ app.post("/tasks", authMiddleware, async (req: AuthRequest, res: Response) => {
             email: true,
           },
         },
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
       },
+      
     });
 
     io.emit("task:created", task);
