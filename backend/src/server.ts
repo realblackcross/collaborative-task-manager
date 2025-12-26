@@ -36,10 +36,14 @@ io.on("connection", (socket) => {
 // app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
 app.use(
   cors({
-    origin: process.env.CLIENT_URL,
+    origin: [
+      "http://localhost:5173",
+      "https://collaborative-task-manager-nu.vercel.app"
+    ],
     credentials: true,
   })
 );
+
 
 app.use(express.json());
 
