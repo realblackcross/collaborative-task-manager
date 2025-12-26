@@ -2,27 +2,11 @@ import { useEffect, useState } from "react";
 
 /* ================= TYPES ================= */
 
-// type Task = {
-//   id: string;
-//   title: string;
-//   description: string;
-//   priority: string;
-//   status: string;
-//   dueDate?: string | null;
-
-//   // 🔹 ADD
-//   assignedTo?: {
-//     id: string;
-//     name: string;
-//     email: string;
-//   } | null;
-// };
-
-// type User = {
-//   id: string;
-//   name: string;
-//   email: string;
-// };
+type User = {
+  id: string;
+  name: string;
+  email: string;
+};
 
 type Task = {
   id: string;
@@ -45,7 +29,6 @@ type Task = {
   };
 };
 
-
 /* ================= COMPONENT ================= */
 
 export default function Tasks({ onLogout }: { onLogout: () => void }) {
@@ -58,17 +41,15 @@ export default function Tasks({ onLogout }: { onLogout: () => void }) {
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("MEDIUM");
   const [dueDate, setDueDate] = useState("");
-  
 
-  // 🔹 ADD
+  const [isSaving, setIsSaving] = useState(false);
+
+
   const [users, setUsers] = useState<User[]>([]);
   const [assignedToId, setAssignedToId] = useState("");
+ 
 
   const userName = localStorage.getItem("name") || "User";
-
-
-  
-  
 
   /* ================= FETCH ================= */
 
@@ -77,11 +58,12 @@ export default function Tasks({ onLogout }: { onLogout: () => void }) {
       try {
         const token = localStorage.getItem("token");
 
-        const res = await fetch("http://localhost:5000/tasks", {
-          headers: {
-            Authorization: "Bearer " + token,
-          },
-        });
+        const res = await fetch(
+          "https://collaborative-task-manager-phxp.onrender.com/tasks",
+          {
+            headers: { Authorization: "Bearer " + token },
+          }
+        );
 
         if (res.status === 401) {
           localStorage.removeItem("token");
@@ -92,18 +74,21 @@ export default function Tasks({ onLogout }: { onLogout: () => void }) {
         const data = await res.json();
         if (Array.isArray(data)) setTasks(data);
 
-        // 🔹 ADD — fetch users for assignment dropdown
-        const usersRes = await fetch("http://localhost:5000/users", {
-          headers: {
-            Authorization: "Bearer " + token,
-          },
-        });
+        const usersRes = await fetch(
+          "https://collaborative-task-manager-phxp.onrender.com/users",
+          {
+            headers: { Authorization: "Bearer " + token },
+          }
+        );
         const usersData = await usersRes.json();
         if (Array.isArray(usersData)) setUsers(usersData);
-
-      } catch {
-        onLogout();
+      // } catch {
+      //   onLogout();
+      // }
+      }catch (err) {
+        console.error("Task fetch failed (retry on refresh):", err);
       }
+      
     };
 
     loadTasks();
@@ -112,99 +97,133 @@ export default function Tasks({ onLogout }: { onLogout: () => void }) {
   /* ================= METRICS ================= */
 
   const total = tasks.length;
-  const completed = tasks.filter(t => t.status === "COMPLETED").length;
+  const completed = tasks.filter((t) => t.status === "COMPLETED").length;
   const pending = total - completed;
   const progress = total === 0 ? 0 : Math.round((completed / total) * 100);
 
   /* ================= ACTIONS ================= */
 
   const createTask = async () => {
-    const res = await fetch("http://localhost:5000/tasks", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + localStorage.getItem("token"),
-      },
-      body: JSON.stringify({
-        title,
-        description,
-        priority,
-        dueDate,
-
-        // 🔹 ADD
-        assignedToId: assignedToId || null,
-      }),
-    });
-
-    const newTask = await res.json();
-    setTasks(prev => [newTask, ...prev]);
-
-    setTitle("");
-    setDescription("");
-    setPriority("MEDIUM");
-    setDueDate("");
-    setAssignedToId(""); // 🔹 ADD
-    setShowModal(false);
+    if (isSaving) return;
+  
+    try {
+      setIsSaving(true);
+      setShowModal(false);
+  
+      const token = localStorage.getItem("token");
+  
+      const res = await fetch(
+        "https://collaborative-task-manager-phxp.onrender.com/tasks",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer " + token,
+          },
+          body: JSON.stringify({
+            title,
+            description,
+            priority,
+            dueDate,
+            assignedToId: assignedToId || null,
+          }),
+        }
+      );
+  
+      if (!res.ok) {
+        alert("Failed to create task");
+        return;
+      }
+  
+      // 🔥 SOURCE OF TRUTH — RELOAD TASKS
+      const refresh = await fetch(
+        "https://collaborative-task-manager-phxp.onrender.com/tasks",
+        {
+          headers: {
+            Authorization: "Bearer " + token,
+          },
+        }
+      );
+  
+      const freshTasks = await refresh.json();
+      setTasks(freshTasks);
+  
+      // reset + close
+      setTitle("");
+      setDescription("");
+      setPriority("MEDIUM");
+      setDueDate("");
+      setAssignedToId("");
+      setShowModal(false);
+    } catch (err) {
+      console.error(err);
+      alert("Something went wrong");
+    } finally {
+      setIsSaving(false);
+    }
   };
+  
+  
 
   const completeTask = async (id: string) => {
-    setTasks(prev =>
-      prev.map(t => (t.id === id ? { ...t, status: "COMPLETED" } : t))
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, status: "COMPLETED" } : t))
     );
 
-    await fetch(`http://localhost:5000/tasks/${id}/status`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + localStorage.getItem("token"),
-      },
-      body: JSON.stringify({ status: "COMPLETED" }),
-    });
+    await fetch(
+      `https://collaborative-task-manager-phxp.onrender.com/tasks/${id}/status`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + localStorage.getItem("token"),
+        },
+        body: JSON.stringify({ status: "COMPLETED" }),
+      }
+    );
   };
 
   const deleteTask = async (id: string) => {
     if (!confirm("Delete this task?")) return;
 
-    setTasks(prev => prev.filter(t => t.id !== id));
+    const res = await fetch(
+      `https://collaborative-task-manager-phxp.onrender.com/tasks/${id}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: "Bearer " + localStorage.getItem("token"),
+        },
+      }
+    );
 
-    await fetch(`http://localhost:5000/tasks/${id}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: "Bearer " + localStorage.getItem("token"),
-      },
-    });
+    if (!res.ok) {
+      alert("Delete failed(deleted by creator only)");
+      return;
+    }
+
+    setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
   /* ================= FILTER ================= */
 
   const visibleTasks =
     filter === "COMPLETED"
-      ? tasks.filter(t => t.status === "COMPLETED")
-      : tasks.filter(t => t.status !== "COMPLETED");
+      ? tasks.filter((t) => t.status === "COMPLETED")
+      : tasks.filter((t) => t.status !== "COMPLETED");
 
   /* ================= UI ================= */
 
   return (
     <div style={page}>
-      {/* <button style={logoutBtn} onClick={onLogout}>Logout</button> */}
-
- 
-
-
-      <h2 style={greeting}>
-        Hi, {userName} — your
-      </h2>
-
+      <h2 style={greeting}>Hi, {userName} — your</h2>
       <h1 style={heading}>Task Manager Is Here</h1>
 
-      {/* DASHBOARD */}
       <div style={dashboard}>
         <Stat label="Total Tasks" value={total} />
         <Stat label="Pending Tasks" value={pending} />
         <Stat label="Completed Tasks" value={completed} />
       </div>
 
-      {/* PROGRESS */}
       <div style={chartBox}>
         <h3>Task Progress</h3>
         <div style={progressBar}>
@@ -214,43 +233,66 @@ export default function Tasks({ onLogout }: { onLogout: () => void }) {
         </div>
       </div>
 
-      {/* FILTER */}
       <div style={filterBar}>
-        <button style={filter === "PENDING" ? activeBtn : btn} onClick={() => setFilter("PENDING")}>
+        <button
+          style={filter === "PENDING" ? activeBtn : btn}
+          onClick={() => setFilter("PENDING")}
+        >
           Pending
         </button>
-        <button style={filter === "COMPLETED" ? activeBtn : btn} onClick={() => setFilter("COMPLETED")}>
+        <button
+          style={filter === "COMPLETED" ? activeBtn : btn}
+          onClick={() => setFilter("COMPLETED")}
+        >
           Completed
         </button>
       </div>
 
-      {/* ADD TASK */}
       <div style={{ textAlign: "center", margin: 30 }}>
-        <button style={addBtn} onClick={() => setShowModal(true)}>+ Add Task</button>
+        <button style={addBtn} onClick={() => setShowModal(true)}>
+          + Add Task
+        </button>
       </div>
 
-      {/* TASKS */}
+      <p
+  style={{
+    textAlign: "center",
+    fontSize: 14,
+    color: "#333",
+    marginTop: -10,
+    marginBottom: 15,
+  }}
+>
+  Note: After saving a task, please reload the tab.
+</p>
+
+
       <div style={grid}>
-        {visibleTasks.map(task => (
+        {visibleTasks.map((task) => (
           <div key={task.id} style={taskCard}>
             <h3>{task.title}</h3>
             <p>{task.description}</p>
 
-            <p><b>Priority:</b> {task.priority}</p>
-            <p><b>Status:</b> {task.status}</p>
-            <p><b>Due Date:</b> {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "Not specified"}</p>
-
-            {/* 🔹 ADD */}
+            <p>
+              <b>Priority:</b> {task.priority}
+            </p>
+            <p>
+              <b>Status:</b> {task.status}
+            </p>
+            <p>
+              <b>Due Date:</b>{" "}
+              {task.dueDate
+                ? new Date(task.dueDate).toLocaleDateString()
+                : "Not specified"}
+            </p>
             <p>
               <b>Assigned To:</b>{" "}
               {task.assignedTo ? task.assignedTo.name : "Unassigned"}
             </p>
-
             <p>
-  <b>Assigned By:</b>{" "}
-  {task.creator ? task.creator.name : "Unknown"}
-</p>
-
+              <b>Assigned By:</b>{" "}
+              {task.creator ? task.creator.name : "Unknown"}
+            </p>
 
             {task.status !== "COMPLETED" && (
               <button style={actionBtn} onClick={() => completeTask(task.id)}>
@@ -266,6 +308,7 @@ export default function Tasks({ onLogout }: { onLogout: () => void }) {
           </div>
         ))}
       </div>
+
       <footer style={footer}>
   <p>Made by --- Tyagi</p>
 
@@ -277,69 +320,68 @@ export default function Tasks({ onLogout }: { onLogout: () => void }) {
 </footer>
 
 
-      {/* MODAL */}
+
       {showModal && (
         <div style={overlay}>
           <div style={modal}>
             <h3>Create Task</h3>
 
-            <input placeholder="Title" value={title} onChange={e => setTitle(e.target.value)} />
-            <textarea placeholder="Description" value={description} onChange={e => setDescription(e.target.value)} />
+            <input
+              placeholder="Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+            <textarea
+              placeholder="Description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
 
-            <select value={priority} onChange={e => setPriority(e.target.value)}>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+            >
               <option>LOW</option>
               <option>MEDIUM</option>
               <option>HIGH</option>
             </select>
 
-            <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
 
-            {/* 🔹 ADD — assign user */}
-<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-  <label
-    style={{
-      fontSize: 13,
-      fontWeight: 600,
-      color: "#333",
-    }}
-  >
-    Assign Task To
-  </label>
-
-  <select
-    value={assignedToId}
-    onChange={(e) => setAssignedToId(e.target.value)}
-    style={{
-      padding: "10px 12px",
-      borderRadius: 8,
-      border: "1px solid #ccc",
-      fontSize: 14,
-      background: "#fff",
-      cursor: "pointer",
-    }}
-  >
-    <option value="">— Unassigned —</option>
-
-    {users.map((u) => (
-      <option key={u.id} value={u.id}>
-        {u.name} ({u.email})
-      </option>
-    ))}
-  </select>
-</div>
-
+            <select
+              value={assignedToId}
+              onChange={(e) => setAssignedToId(e.target.value)}
+            >
+              <option value="">— Unassigned —</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name} ({u.email})
+                </option>
+              ))}
+            </select>
 
             <div style={modalActions}>
-  <button style={actionBtn} onClick={createTask}>Save</button>
-  <button
-    style={{ ...actionBtn, background: "#e0e0e0", color: "#000" }}
-    onClick={() => setShowModal(false)}
-  >
-    Cancel
-  </button>
+              <button
+                style={{
+                  ...actionBtn,
+                  opacity: isSaving ? 0.6 : 1,
+                }}
+                onClick={createTask}
+                disabled={isSaving}
+              >
+                {isSaving ? "Saving..." : "Save"}
+              </button>
 
-
-
+              <button
+                style={{ ...actionBtn, background: "#e0e0e0", color: "#000" }}
+                onClick={() => setShowModal(false)}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
@@ -358,6 +400,10 @@ function Stat({ label, value }: { label: string; value: number }) {
     </div>
   );
 }
+
+ 
+
+ 
 
 /* ================= STYLES ================= */
 

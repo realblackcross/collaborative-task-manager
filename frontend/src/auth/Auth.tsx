@@ -20,7 +20,7 @@ export default function Auth({ onAuthSuccess }: Props) {
   const resetPassword = async () => {
     setError("");
 
-    const res = await fetch("http://localhost:5000/auth/reset-password", {
+    const res = await fetch("https://collaborative-task-manager-phxp.onrender.com/auth/reset-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -47,8 +47,8 @@ export default function Auth({ onAuthSuccess }: Props) {
     setError("");
 
     const url = isLogin
-      ? "http://localhost:5000/auth/login"
-      : "http://localhost:5000/auth/register";
+      ? "https://collaborative-task-manager-phxp.onrender.com/auth/login"
+      : "https://collaborative-task-manager-phxp.onrender.com/auth/register";
 
     const body = isLogin
       ? { email, password }
