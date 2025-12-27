@@ -243,11 +243,9 @@ https://collaborative-task-manager-phxp.onrender.com
 
 ## 📸 Screenshots
 
-Example:
+### Dashboard View
+![Dashboard](Screenshot%202025-12-21%20021536.png)
 
-```md
-![Login Page](screenshots/login.png)
-```
 
 ---
 
